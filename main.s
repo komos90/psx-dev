@@ -87,19 +87,56 @@ main:
     jal     init_gpu
 
     # Infinite loop
+    move    $6, $0
+    li      $7, 0xfffff
 _main_loop:
-    li      $2, 0x04000000
-    sw      $2, 0x1f801814
-    li      $2, 0x20
+    # Clear screen
+    li      $2, 0x2
     sll     $2, 24
-    or      $2, $2, 0x00ffffff
-    li      $3, 0x00500050
-    li      $4, 0x00500100
-    li      $5, 0x00C00100
+    or      $2, 0x0 # Black
     sw      $2, 0x1f801810
-    sw      $3, 0x1f801810
-    sw      $4, 0x1f801810
-    sw      $5, 0x1f801810
+    li      $2, 0x0
+    sw      $2, 0x1f801810
+    li      $2, 0x01ff03ff
+    sw      $2, 0x1f801810
+
+    li      $7, 0xfffff
+    add     $6, 1
+
+    li      $2, 0x03000000
+    sw      $2, 0x1f801814
+    li      $2, 0x30
+    sll     $2, 24
+    or      $2, $2, 0x00ff0000
+    and     $6, 0xff
+    or      $2, $6
+    sw      $2, 0x1f801810
+
+    li      $2, 0x00500000
+    add     $2, $6
+    sw      $2, 0x1f801810
+
+    li      $2, 0x0000ff00
+    add     $2, $6
+    sw      $2, 0x1f801810
+
+    li      $2, 0x00500050
+    add     $2, $6
+    sw      $2, 0x1f801810
+
+    li      $2, 0x000000ff
+    add     $2, $6
+    sw      $2, 0x1f801810
+
+    li      $2, 0x00C00050
+    add     $2, $6
+    sw      $2, 0x1f801810
+
+    # Spin for a bit
+_main_spin:
+    sub     $7, 1
+    bne     $7, $0, _main_spin
+
     j       _main_loop
 
     # Restore and return
@@ -108,4 +145,3 @@ _main_loop:
     lw      $fp,16($sp)
     addu    $sp,$sp,24
     j       $31
-
