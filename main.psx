@@ -1,0 +1,182 @@
+.psx
+.create "main.bin", 0x80010000
+
+.org 0x80010000
+main:
+    ; Save stack pointer, frame pointer, and return address
+    subiu   $sp,$sp,24
+    sw      $ra,20($sp)
+    nop
+    sw      $fp,16($sp)
+    nop
+    move    $fp,$sp
+
+    jal     init_gpu
+    nop
+
+    ; Infinite loop
+    move    $6, $0
+    li      $7, 0xfffff
+@@main_loop:
+    ; Clear screen
+    li      $2, 0x2
+    sll     $2, 24
+    ori     $2, 0x0 ; Black
+    sw      $2, 0x1f801810
+    nop
+    li      $2, 0x0
+    sw      $2, 0x1f801810
+    nop
+    li      $2, 0x01ff03ff
+    sw      $2, 0x1f801810
+    nop
+
+    li      $7, 0xfffff
+    addi    $6, 1
+
+    li      $2, 0x03000000
+    sw      $2, 0x1f801814
+    nop
+    li      $2, 0x30
+    sll     $2, 24
+    li      $3, 0xff
+    sll     $3, 16
+    or      $2, $2, $3
+    andi    $6, 0xff
+    or      $2, $6
+    sw      $2, 0x1f801810
+    nop
+
+    li      $2, 0x00500000
+    add     $2, $6
+    sw      $2, 0x1f801810
+    nop
+
+    li      $2, 0x0000ff00
+    add     $2, $6
+    sw      $2, 0x1f801810
+    nop
+
+    li      $2, 0x00500050
+    add     $2, $6
+    sw      $2, 0x1f801810
+    nop
+
+    li      $2, 0x000000ff
+    add     $2, $6
+    sw      $2, 0x1f801810
+    nop
+
+    li      $2, 0x00C00050
+    add     $2, $6
+    sw      $2, 0x1f801810
+    nop
+
+    ; Spin for a bit
+@@spin:
+    subi    $7, 1
+    bne     $7, $0, @@spin
+    nop
+
+    j       @@main_loop
+    nop
+
+    ; Restore and return
+    move    $sp,$fp
+    lw      $ra,20($sp)
+    lw      $fp,16($sp)
+    addiu   $sp,$sp,24
+    jr      $ra
+    nop
+
+; write commands to the gpu_command port
+gpu_comm:
+    sll     $a0, 24
+    or      $a0, $a1
+    sw      $a0, 0x1f801814
+    nop
+    jr      $ra
+    nop
+
+; write commands to the gpu_data port
+gpu_data:
+    sll     $a0, 24
+    or      $a0, $a1
+    sw      $a0, 0x1f801810
+    nop
+    jr      $ra
+    nop
+
+; Init the gpu so we're ready to draw
+init_gpu:
+    ; Save the return address
+    move    $s0, $ra
+
+    ; Reset the GPU
+    li      $a0, 0
+    li      $a1, 0
+    jal     gpu_comm
+    nop
+    ; Set the horizontal start/end
+    li      $a0, 6
+    li      $a1, 0xc56
+    sll     $a1, 12
+    ori     $a1, 0x250
+    jal     gpu_comm
+    nop
+    ; Set the vertical start/end
+    li      $a0, 7
+    li      $a1, 0x100
+    sll     $a1, 10
+    ori     $a1, 0x10
+    jal     gpu_comm
+    nop
+    ; Set display mode
+    li      $a0, 8
+    li      $a1, 0x21 ; 0b0010_0001
+    jal     gpu_comm
+    nop
+    ; Set display offset
+    li      $a0, 5
+    li      $a1, 0x0
+    jal     gpu_comm
+    nop
+    ; Set draw mode
+    li      $a0, 0xe1
+    li      $a1, 0x200
+    jal     gpu_data
+    nop
+    ; Set draw area
+    li      $a0, 0xe3
+    li      $a1, 0x0
+    jal     gpu_data
+    nop
+    ; Set draw area
+    li      $a0, 0xe4
+    li      $a1, 0x3BD
+    sll     $a1, 8
+    ori     $a1, 0x3F
+    jal     gpu_data
+    nop
+    ; Set draw offset
+    li      $a0, 0xe5
+    li      $a1, 0x0
+    jal     gpu_data
+    nop
+    ; Set DMA to CPU->GPU
+    li      $a0, 4
+    li      $a1, 0x2
+    jal     gpu_comm
+    nop
+    ; Enable the display
+    li      $a0, 0x3
+    li      $a1, 0x0
+    jal     gpu_comm
+    nop
+
+    ; Restore the return address, and return
+    move    $ra, $s0
+    jr      $ra
+    nop
+
+.close
