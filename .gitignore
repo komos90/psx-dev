@@ -4,3 +4,5 @@
 *.EXE
 *.sym
 *.bin
+.ninja_deps
+.ninja_log

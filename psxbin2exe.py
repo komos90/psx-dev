@@ -48,7 +48,6 @@ def main(argv):
         for i in range(0,int(math.ceil(float(infile_size)/buffer_size))):
             buffer = ifile.read(buffer_size)
             ofile.write(buffer)
-        # ofile.write(ifile.read())
 
         # Pad binary to 0x800 boundary
         exe_size = ofile.tell()
