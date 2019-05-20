@@ -28,15 +28,15 @@ def main(argv):
             ofile.write(bytes('PS-X EXE', 'ascii'))
         else:
             ofile.write('PS-X EXE')
-        # Entry point
         ofile.seek(0x10)
+        # Entry point
         ofile.write(struct.pack('<I',0x80010000))
         # Initial GP/R28 (crt0.S currently sets this)
         ofile.write(struct.pack('<I',0xFFFFFFFF))
         # Destination address in RAM
         ofile.write(struct.pack('<I',0x80010000))
-        # Initial SP/R29 & FP/R30
         ofile.seek(0x30)
+        # Initial SP/R29 & FP/R30
         ofile.write(struct.pack('<I',0x801FFF00))
         # SP & FP offset added to    ^^^^^^^^^^ just use 0
         #ofile.write(struct.pack('<I',0x00000000))
