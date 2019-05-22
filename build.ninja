@@ -4,7 +4,7 @@ rule asm
 rule bin2exe
     command = python psxbin2exe.py $in $out
 
-build main.bin: asm main.psx
+build main.bin: asm main.psx | math.psx tables.psx
 build main.exe: bin2exe main.bin
 
 default main.exe

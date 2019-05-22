@@ -1,0 +1,28 @@
+.include "tables.psx"
+
+.macro macro_math_angle_add_i, a0, i0
+    addi    a0, i0
+    andi    a0, 0xff
+.endmacro
+
+.macro macro_math_angle_sub_i, a0, i0
+    subi    a0, i0
+    andi    a0, 0xff
+.endmacro
+
+math_sin:
+    la      $a1, tbl_sine
+    sll     $a0, 1
+    add     $a0, $a1
+    lhu     $v0, 0($a0)
+    jr      $ra
+    nop
+
+math_cos:
+    la      $a1, tbl_sine
+    macro_math_angle_add_i a0, 0x40
+    sll     $a0, 1
+    add     $a0, $a1
+    lhu     $v0, 0($a0)
+    jr      $ra
+    nop
