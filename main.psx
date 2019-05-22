@@ -151,13 +151,38 @@ main:
     sw      $v0, 0x1f801810
     nop
 
+; c 0 s
+; 0 1
+
     ; Load sine $t0
-    la       $t7, tbl_sine
-    sra      $t3, $t0, 7
-    add      $s1, $t3, $t7
-    lh       $s2, 0($s1)
+    la      $t7, tbl_sine
+    srl     $t3, $t0, 7
+    add     $s1, $t3, $t7
+    lhu     $s2, 0($s1)
     nop
-    sra      $a1, $s2, 6
+    sll     $t3, 1
+    ;$s2 now has sine
+    addi    $t3, 0x19
+    blt     $t3, 0x64, @@no_correction
+    nop
+    subi    $t3, 0x64
+@@no_correction:
+    srl     $t3, 1
+    add     $s1, $t3, $t7
+    lhu     $s3, 0($s1)
+    nop
+
+    ; Fill out GTE rotation matrix
+    xori    $s3, 0x8000
+    ctc2    $s2, $0
+    ctc2    $s3, $1
+    addi    $s4, $zero, 0x1
+    ctc2    $s4, $2
+    xori    $s3, 0x8000
+    ctc2    $s3, $3
+    ctc2    $s2, $4
+
+    ;
 
     ; Draw a guroud shaded triangle
     li      $v0, 0x03000000
