@@ -182,9 +182,92 @@ main:
     ctc2    $s3, $3
     ctc2    $s2, $4
 
-    ;
+    ;; Perform rotation of vertex 0
+    ; Load vertex
+    la      $s2, d_3d_triange_v0
+    lw      $s0, 0($s2)
+    lhu     $s1, 4($s2)
 
-    ; Draw a guroud shaded triangle
+    ; Pass to GTE
+    mtc2    $s0, $0
+    mtc2    $s1, $1
+
+    ; Execute rotation
+    cop2    0x0486012 ; v0 * rotmatrix
+
+    ; Get our values back
+    mfc2    $s3, $9
+    mfc2    $s4, $10
+    la      $s5, d_triange_v0
+
+    ; Convert to screen coords
+    andi     $s3, 0xff00
+    andi     $s4, 0xff00
+    sra     $s3, 8
+    sll     $s4, 8
+    or      $s3, $s4
+
+    ; And store them
+    sw      $s3, 0($s5)
+
+    ;; Perform rotation of vertex 1
+    ; Load vertex
+    la      $s2, d_3d_triange_v1
+    lw      $s0, 0($s2)
+    lhu     $s1, 4($s2)
+
+    ; Pass to GTE
+    mtc2    $s0, $0
+    mtc2    $s1, $1
+
+    ; Execute rotation
+    cop2    0x0486012 ; v0 * rotmatrix
+
+    ; Get our values back
+    mfc2    $s3, $9
+    mfc2    $s4, $10
+    la      $s5, d_triange_v1
+
+    ; Convert to screen coords
+    andi     $s3, 0xff00
+    andi     $s4, 0xff00
+    sra     $s3, 8
+    sll     $s4, 8
+    or      $s3, $s4
+
+    ; And store them
+    sw      $s3, 0($s5)
+
+    ;; Perform rotation of vertex 2
+    ; Load vertex
+    la      $s2, d_3d_triange_v2
+    lw      $s0, 0($s2)
+    lhu     $s1, 4($s2)
+
+    ; Pass to GTE
+    mtc2    $s0, $0
+    mtc2    $s1, $1
+
+    ; Execute rotation
+    cop2    0x0486012 ; v0 * rotmatrix
+
+    ; Get our values back
+    mfc2    $s3, $9
+    mfc2    $s4, $10
+    la      $s5, d_triange_v2
+
+    ; Convert to screen coords
+    andi     $s3, 0xff00
+    andi     $s4, 0xff00
+    sra     $s3, 8
+    sll     $s4, 8
+    or      $s3, $s4
+
+    ; And store them
+    sw      $s3, 0($s5)
+
+
+    ;; Draw a guroud shaded triangle
     li      $v0, 0x03000000
     sw      $v0, 0x1f801814
     nop
@@ -356,18 +439,21 @@ init_gpu:
 .align 4
 d_triange_v0:
 .halfword 0, -50
+.align 4
 d_triange_v1:
 .halfword 50, 50
+.align 4
 d_triange_v2:
 .halfword -50, 50
 
 .align 4
 d_3d_triange_v0:
-.word 0, -50, 0
+.halfword 0, 0x9000, 0
+.align 4
 d_3d_triange_v1:
-.word 50, 50, 0
+.halfword 0x1000, 0x1000, 0
+.align 4
 d_3d_triange_v2:
-.word -50, 50, 0
-
+.halfword 0x9000, 0x1000, 0
 
 .close
