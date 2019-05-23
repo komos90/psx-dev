@@ -8,7 +8,6 @@
 .word 0x80010000
 .word 0xffffffff
 .word 0x80010000
-.orga 0x1c
 .word filesize("main.bin")
 .orga 0x30
 .word 0x801FFF00
@@ -18,6 +17,4 @@
 ; Main code binary
 .incbin "main.bin"
 
-; Pad end
-.align 0x800
 .close

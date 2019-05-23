@@ -2,7 +2,6 @@ rule asm
     command = armips $in
 
 build main.bin: asm main.psx | math.psx tables.psx
-
 build main.exe: asm header.psx | main.bin
 
 default main.exe
