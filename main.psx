@@ -1,9 +1,6 @@
 .psx
 .create "main.bin", 0x80010000
 
-
-.org 0x80010000
-.align 4
 j main
 nop
 
@@ -320,4 +317,5 @@ d_3d_triange_v1:
 d_3d_triange_v2:
 .halfword -0x50, 0x50, 0x0
 
+.align 0x800
 .close

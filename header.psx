@@ -1,0 +1,23 @@
+.create "main.exe", 0x0
+.psx
+
+; Header
+.orga 0x0
+.ascii "PS-X EXE"
+.orga 0x10
+.word 0x80010000
+.word 0xffffffff
+.word 0x80010000
+.orga 0x1c
+.word filesize("main.bin")
+.orga 0x30
+.word 0x801FFF00
+.orga 0x800
+; End of header
+
+; Main code binary
+.incbin "main.bin"
+
+; Pad end
+.align 0x800
+.close

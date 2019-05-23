@@ -1,10 +1,8 @@
 rule asm
     command = armips $in
 
-rule bin2exe
-    command = python psxbin2exe.py $in $out
-
 build main.bin: asm main.psx | math.psx tables.psx
-build main.exe: bin2exe main.bin
+
+build main.exe: asm header.psx | main.bin
 
 default main.exe
