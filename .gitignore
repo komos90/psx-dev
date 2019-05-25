@@ -8,4 +8,5 @@
 .ninja_log
 *.bak
 __pycache__
+*.blend1
 

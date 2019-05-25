@@ -78,7 +78,7 @@ nop
     nop
     ; Set draw offset
     li      $a0, 0xe5
-    li      $a1, 0x0
+    li      $a1, 0b111111100010110000
     jal     @gpu_data
     nop
     ; Set DMA to CPU->GPU
@@ -120,6 +120,10 @@ nop
     or      $t0, $t1
     mtc0    $t0, $sr
 
+    li      $t0, 0x100
+    ctc2    $t0, $24
+    ctc2    $t0, $25
+
     ; Infinite loop
     li      $s0, 0x00000
 @@main_loop:
@@ -129,35 +133,42 @@ nop
     ; Calculate sine & cos for rot mat
     move    $a0, $s0
     jal     math_sin
-    move    $t0, $a0
+    move    $t0, $v0
 
     move    $a0, $s0
     jal     math_cos
     move    $t1, $v0
 
-    ; Fill out GTE rotation matrix
-    sub     $t0, $zero, $t0
-    ctc2    $t1, $0
+    ;; Fill out GTE rotation matrix
+    move    $t3, $t0
+    sub     $t3, $zero, $t3
+    sll     $t3, 16
+    or      $t3, $t1
+    ctc2    $t3, $0
+    sll     $t0, 16
     ctc2    $t0, $1
     li      $t2, 0x1000
-    ctc2    $t2, $2
-    sub     $t0, $zero, $t0
-    ctc2    $t0, $3
-    ctc2    $t1, $4
+    ctc2    $t1, $2
+    ctc2    $zero, $3
+    ctc2    $t2, $4
 
     ; Set H value
     li      $t0, 0x30
     ctc2    $t0, $26
 
     ; Set our translation vector
-    li      $t0, 0x80
+    li      $t0, 0x100
     ctc2    $t0, $7
 
+    la      $s2, d_icosphere_mesh
+    lw      $s1, d_icosphere_mesh
+    addi    $s2, 4
+@@for_each_tri:
     ;; Perform rotation of vertex 0
     ; Load vertex
-    la      $t0, d_3d_triange_v0
-    lw      $t1, 0($t0)
-    lhu     $t2, 4($t0)
+    lw      $t1, 0($s2)
+    lhu     $t2, 4($s2)
+    addi    $s2, 8
 
     ; Pass to GTE
     mtc2    $t1, $0
@@ -165,9 +176,9 @@ nop
 
     ;; Perform rotation of vertex 1
     ; Load vertex
-    la      $t0, d_3d_triange_v1
-    lw      $t1, 0($t0)
-    lhu     $t2, 4($t0)
+    lw      $t1, 0($s2)
+    lhu     $t2, 4($s2)
+    addi    $s2, 8
 
     ; Pass to GTE
     mtc2    $t1, $2
@@ -175,9 +186,9 @@ nop
 
     ;; Perform rotation of vertex 2
     ; Load vertex
-    la      $t0, d_3d_triange_v2
-    lw      $t1, 0($t0)
-    lhu     $t2, 4($t0)
+    lw      $t1, 0($s2)
+    lhu     $t2, 4($s2)
+    addi    $s2, 8
 
     ; Pass to GTE
     mtc2    $t1, $4
@@ -202,10 +213,6 @@ nop
 
     ; Vertex 0 pos
     lw      $t0, d_triange_v0
-    li      $t1, 100
-    sll     $t1, 16
-    ori     $t1, 150
-    add     $t0, $t1
     sw      $t0, @gpu_data_addr
 
     ; Vertex 1 colour
@@ -215,10 +222,6 @@ nop
 
     ; Vertex 1 pos
     lw      $t0, d_triange_v1
-    li      $t1, 100
-    sll     $t1, 16
-    ori     $t1, 150
-    add     $t0, $t1
     sw      $t0, @gpu_data_addr
     nop
 
@@ -228,18 +231,18 @@ nop
 
     ; Vertex 2 pos
     lw      $t0, d_triange_v2
-    li      $t1, 100
-    sll     $t1, 16
-    ori     $t1, 150
-    add     $t0, $t1
     sw      $t0, @gpu_data_addr
+    nop
+
+    subi    $s1, 1
+    bne     $s1, $zero, @@for_each_tri
     nop
 
     addi    $s0, 0x1
     andi    $s0, $s0, 0xff
 
     ; Start timer
-    li      $t0, 0xffff
+    li      $t0, 0xfffff
     ; Spin for a bit
 @@spin:
     subi    $t0, 1
@@ -277,9 +280,7 @@ d_3d_triange_v2:
 .halfword -0x50, 0x50, 0x0
 
 .align 4
-d_pyramid_mesh_file_size:
-.word filesize("raw_assets/meshes/icosphere.pxm")
-d_pyramid_mesh:
+d_icosphere_mesh:
 .incbin "raw_assets/meshes/icosphere.pxm"
 
 .align 0x800
