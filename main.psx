@@ -8,6 +8,11 @@ nop
 
 @gpu_comm_addr equ 0x1f801814
 @gpu_data_addr equ 0x1f801810
+@dma_primary_control equ 0x1f8010f0
+@dma_block_control equ 0x1f8010e4
+@d6_madr equ 0x1f8010e0
+@d6_chsr equ 0x1f8010e8
+@ordering_table_size equ 0x10000
 
 ; write commands to the gpu_command port
 @gpu_comm:
@@ -107,6 +112,25 @@ nop
     jr      $ra
     nop
 
+
+@_ot_insert_first0:
+    la      $t2, 0x00ffffff
+    j       @_ot_insert_loop0
+    nop
+
+; $a0: pointer to the entry to insert
+; $a1: OT index (Z value)
+@ot_insert:
+    la      $t1, @ordering_table
+    beq     $a0, $zero, @_ot_insert_first0
+    addu    $t1, $a0 ;effective nop on branch
+    subiu   $t2, 8
+@_ot_insert_loop0:
+    move    $t0, $t1
+    lw      $t1, 4($t0)
+    bne     $t1, $t2, @_ot_insert_loop0
+    nop
+
 @main:
     subiu   $sp,$sp,4
     sw      $ra,0($sp)
@@ -124,9 +148,24 @@ nop
     ctc2    $t0, $24
     ctc2    $t0, $25
 
+    ; Enable DMA
+    li      $t0, 1
+    sll     $t0, 27
+    sw      $t0, @dma_primary_control
+
+    ; Prepare ordering table
+    li      $t0, @ordering_table_last
+    sw      $t0, @d6_madr
+    li      $t0, @ordering_table_size
+    sw      $t0, @dma_block_control
+
     ; Infinite loop
     li      $s0, 0x00000
 @@main_loop:
+    ; Generate / regenerate ordering table
+    li      $t0, 0x11000002
+    sw      $t0, @d6_chsr
+
     jal     @clear_screen
     nop
 
@@ -160,8 +199,8 @@ nop
     li      $t0, 0x100
     ctc2    $t0, $7
 
-    la      $s2, d_icosphere_mesh
-    lw      $s1, d_icosphere_mesh
+    la      $s2, @d_icosphere_mesh
+    lw      $s1, @d_icosphere_mesh
     addi    $s2, 4
 @@for_each_tri:
     ;; Perform rotation of vertex 0
@@ -201,37 +240,52 @@ nop
     mfc2    $t0, $12
     mfc2    $t1, $13
     mfc2    $t2, $14
-    sw      $t0, d_triange_v0
-    sw      $t1, d_triange_v1
-    sw      $t2, d_triange_v2
+    mfc2    $t3, $16
+    mfc2    $t4, $17
+    mfc2    $t5, $18
+
+    sw      $t0, @d_triange_v0_xy
+    sw      $t3, @d_triange_v0_z
+    sw      $t1, @d_triange_v1_xy
+    sw      $t4, @d_triange_v1_z
+    sw      $t2, @d_triange_v2_xy
+    sw      $t5, @d_triange_v2_z
+
+    la      $t6, @d_icosphere_dest
+    addu    $t6, $s2
+    subiu   $t6, 24
 
     ;; Draw a guroud shaded triangle
-    li      $t0, 0x03000000
-    sw      $t0, @gpu_comm_addr
+    li      $t0, 6
+    sw      $t0, 8($t6)
+
+    ; Figure out addresses
+    la      $t0, 6
+    sw      $t0, 8($t6)
     li      $t0, 0x30ff0000
-    sw      $t0, @gpu_data_addr
+    sw      $t0, 4($t6)
 
     ; Vertex 0 pos
-    lw      $t0, d_triange_v0
-    sw      $t0, @gpu_data_addr
+    lw      $t0, @d_triange_v0_xy
+    sw      $t0, 12($t6)
 
     ; Vertex 1 colour
     li      $t0, 0x0000ff00
-    sw      $t0, @gpu_data_addr
+    sw      $t0, 16($t6)
     nop
 
     ; Vertex 1 pos
-    lw      $t0, d_triange_v1
-    sw      $t0, @gpu_data_addr
+    lw      $t0, @d_triange_v1_xy
+    sw      $t0, 20($t6)
     nop
 
     ; Vertex 2 colour
     li      $t0, 0x000000ff
-    sw      $t0, @gpu_data_addr
+    sw      $t0, 24($t6)
 
     ; Vertex 2 pos
-    lw      $t0, d_triange_v2
-    sw      $t0, @gpu_data_addr
+    lw      $t0, @d_triange_v2_xy
+    sw      $t0, 28($t6)
     nop
 
     subi    $s1, 1
@@ -260,28 +314,30 @@ nop
     nop
 
 .align 4
-d_triange_v0:
-.halfword 0, -50
-.align 4
-d_triange_v1:
-.halfword 50, 50
-.align 4
-d_triange_v2:
-.halfword -50, 50
+@d_triange_v0_xy:
+.word 0
+@d_triange_v0_z:
+.word 0
+@d_triange_v1_xy:
+.word 0
+@d_triange_v1_z:
+.word 0
+@d_triange_v2_xy:
+.word 0
+@d_triange_v2_z:
+.word 0
 
 .align 4
-d_3d_triange_v0:
-.halfword 0, -0x50, 0x0
-.align 4
-d_3d_triange_v1:
-.halfword 0x50, 0x50, 0x0
-.align 4
-d_3d_triange_v2:
-.halfword -0x50, 0x50, 0x0
+@ordering_table:
+.fill @ordering_table_size * 4 - 1
+@ordering_table_last:
+.word 0
 
 .align 4
-d_icosphere_mesh:
+@d_icosphere_mesh:
 .incbin "raw_assets/meshes/icosphere.pxm"
+@d_icosphere_dest:
+.fill filesize ("raw_assets/meshes/icosphere.pxm")
 
 .align 0x800
 .close
