@@ -6,3 +6,6 @@
 *.bin
 .ninja_deps
 .ninja_log
+*.bak
+__pycache__
+

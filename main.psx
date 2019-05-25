@@ -276,5 +276,11 @@ d_3d_triange_v1:
 d_3d_triange_v2:
 .halfword -0x50, 0x50, 0x0
 
+.align 4
+d_pyramid_mesh_file_size:
+.word filesize("raw_assets/meshes/icosphere.pxm")
+d_pyramid_mesh:
+.incbin "raw_assets/meshes/icosphere.pxm"
+
 .align 0x800
 .close
