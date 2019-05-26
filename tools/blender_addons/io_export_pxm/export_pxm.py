@@ -1,6 +1,9 @@
 import bpy
 import struct
 
+# FORMAT
+# U32: face count, U16: x0, U16: y0, U16: z0, U16: blank, U16: x1, ...
+
 def faceValues(face, mesh, matrix):
     fv = []
     for verti in face.vertices:
@@ -11,10 +14,10 @@ def hex2(n):
     return hex (n & 0xffff)
 
 def to_16uint(v):
-    return int(v[0] * 0x100)
+    return int(v * 0x100) & 0xffff
 
 def faceToLine(face):
-    return b''.join([struct.pack('<H', to_16uint(v) & 0xffff) for v in face])
+    return b''.join([struct.pack('<HHHH', to_16uint(v[1]), to_16uint(v[0]), to_16uint(v[2]), 0) for v in face])
 
 def write(filepath,):
     scene = bpy.context.scene
@@ -31,6 +34,7 @@ def write(filepath,):
 
     # write the faces to a file
     file = open(filepath, "bw")
+    file.write(struct.pack('<I', len(faces)))
     for face in faces:
         file.write(faceToLine(face))
     file.close()
