@@ -1,6 +1,7 @@
 .psx
 .create "main.bin", 0x80010000
 
+.align 4
 j @main
 nop
 
@@ -14,6 +15,7 @@ nop
 @d6_chsr equ 0x1f8010e8
 @ordering_table_size equ 0x10000
 
+.align 4
 ; write commands to the gpu_command port
 @gpu_comm:
     sll     $a0, 24
@@ -112,23 +114,15 @@ nop
     jr      $ra
     nop
 
-
-@_ot_insert_first0:
-    la      $t2, 0x00ffffff
-    j       @_ot_insert_loop0
-    nop
-
 ; $a0: pointer to the entry to insert
 ; $a1: OT index (Z value)
 @ot_insert:
-    la      $t1, @ordering_table
-    beq     $a0, $zero, @_ot_insert_first0
-    addu    $t1, $a0 ;effective nop on branch
-    subiu   $t2, 8
-@_ot_insert_loop0:
-    move    $t0, $t1
+    la      $t0, @ordering_table
+    addu    $t0, $a1
     lw      $t1, 4($t0)
-    bne     $t1, $t2, @_ot_insert_loop0
+    sw      $a0, 4($t0)
+    sw      $t1, 4($a0)
+    jr      $ra
     nop
 
 @main:
@@ -244,54 +238,36 @@ nop
     mfc2    $t4, $17
     mfc2    $t5, $18
 
-    sw      $t0, @d_triange_v0_xy
-    sw      $t3, @d_triange_v0_z
-    sw      $t1, @d_triange_v1_xy
-    sw      $t4, @d_triange_v1_z
-    sw      $t2, @d_triange_v2_xy
-    sw      $t5, @d_triange_v2_z
+    ; Save primitive & put in OT
+    la      $t7, @primitives
+    addu    $t7, $s1
+    li      $t8, 0x6
+    sw      $t8, 0($t7)
+    li      $t8, 0x30ff0000
+    sw      $t8, 4($t7)
+    sw      $t0, 8($t7)
+    li      $t8, 0x0000ff00
+    sw      $t8, 12($t7)
+    sw      $t1, 16($t7)
+    li      $t8, 0x000000ff
+    sw      $t8, 20($t7)
+    sw      $t2, 24($t7)
 
-    la      $t6, @d_icosphere_dest
-    addu    $t6, $s2
-    subiu   $t6, 24
-
-    ;; Draw a guroud shaded triangle
-    li      $t0, 6
-    sw      $t0, 8($t6)
-
-    ; Figure out addresses
-    la      $t0, 6
-    sw      $t0, 8($t6)
-    li      $t0, 0x30ff0000
-    sw      $t0, 4($t6)
-
-    ; Vertex 0 pos
-    lw      $t0, @d_triange_v0_xy
-    sw      $t0, 12($t6)
-
-    ; Vertex 1 colour
-    li      $t0, 0x0000ff00
-    sw      $t0, 16($t6)
+    ; Insert into OT
+    move    $a0, $t7
+    move    $a1, $t3; random z value, should average
+    jal     @ot_insert
     nop
 
-    ; Vertex 1 pos
-    lw      $t0, @d_triange_v1_xy
-    sw      $t0, 20($t6)
-    nop
-
-    ; Vertex 2 colour
-    li      $t0, 0x000000ff
-    sw      $t0, 24($t6)
-
-    ; Vertex 2 pos
-    lw      $t0, @d_triange_v2_xy
-    sw      $t0, 28($t6)
-    nop
-
-    subi    $s1, 1
+    ; Branch back to the start of the loop for the rest of the polys
     bne     $s1, $zero, @@for_each_tri
     nop
 
+    ; Initiate DMA transfer:
+    li      $t0, 0x01000401; set link mode, memory->GPU, DMA enable
+    sw      $t0, @d6_chsr
+
+    ; Increment rotation angle % 0xff
     addi    $s0, 0x1
     andi    $s0, $s0, 0xff
 
@@ -329,9 +305,14 @@ nop
 
 .align 4
 @ordering_table:
-.fill @ordering_table_size * 4 - 1
+.fill (@ordering_table_size * 4 * 2) - 1
 @ordering_table_last:
 .word 0
+
+; TODO: replace with frame scratch pad allocator
+.align 4
+@primitives:
+.fill (@ordering_table_size * 4 * 8)
 
 .align 4
 @d_icosphere_mesh:
@@ -341,3 +322,4 @@ nop
 
 .align 0x800
 .close
+
