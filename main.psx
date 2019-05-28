@@ -13,7 +13,7 @@ nop
 @dma_block_control equ 0x1f8010e4
 @d6_madr equ 0x1f8010e0
 @d6_chsr equ 0x1f8010e8
-@ordering_table_size equ 0x10000
+@ordering_table_size equ 0x100
 
 .align 4
 ; write commands to the gpu_command port
@@ -118,6 +118,7 @@ nop
 ; $a1: OT index (Z value)
 @ot_insert:
     la      $t0, @ordering_table
+    sll     $a1, 2
     addu    $t0, $a1
     lw      $t1, 4($t0)
     sw      $a0, 4($t0)
@@ -240,7 +241,7 @@ nop
 
     ; Save primitive & put in OT
     la      $t7, @primitives
-    addu    $t7, $s1
+    addu    $t7, $s2
     li      $t8, 0x6
     sw      $t8, 0($t7)
     li      $t8, 0x30ff0000
@@ -256,9 +257,11 @@ nop
     ; Insert into OT
     move    $a0, $t7
     move    $a1, $t3; random z value, should average
+    srl     $a1, 8
     jal     @ot_insert
     nop
 
+    subiu   $s1, 1
     ; Branch back to the start of the loop for the rest of the polys
     bne     $s1, $zero, @@for_each_tri
     nop
@@ -309,16 +312,14 @@ nop
 @ordering_table_last:
 .word 0
 
-; TODO: replace with frame scratch pad allocator
-.align 4
-@primitives:
-.fill (@ordering_table_size * 4 * 8)
-
 .align 4
 @d_icosphere_mesh:
 .incbin "raw_assets/meshes/icosphere.pxm"
-@d_icosphere_dest:
-.fill filesize ("raw_assets/meshes/icosphere.pxm")
+
+; TODO: replace with frame scratch pad allocator
+.align 4
+@primitives:
+;.fill (@ordering_table_size * 4 * 8)
 
 .align 0x800
 .close
