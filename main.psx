@@ -249,31 +249,79 @@ nop
     ; Calculate sine & cos for rot mat
     move    $a0, $s0
     jal     math_sin
+    nop
     move    $t0, $v0
 
     move    $a0, $s0
     jal     math_cos
+    nop
     move    $t1, $v0
 
+    sub     $t2, $zero, $t0
+
+    ; Populate axis rotation matrices
+    la      $t3, @mat_y_axis_rot_mat
+    sh      $t1, ($t3)
+    addiu   $t3, 2 * 2
+    sh      $t0, ($t3)
+    addiu   $t3, 2 * 4
+    sh      $t2, ($t3)
+    addiu   $t3, 2 * 2
+    sh      $t1, ($t3)
+    la      $t3, @mat_z_axis_rot_mat
+    sh      $t1, ($t3)
+    addiu   $t3, 2 * 1
+    sh      $t0, ($t3)
+    addiu   $t3, 2 * 2
+    sh      $t2, ($t3)
+    addiu   $t3, 2 * 1
+    sh      $t1, ($t3)
+
+    ; Combine x & y rotations
+    la $a0, @mat_y_axis_rot_mat
+    la $a1, @mat_z_axis_rot_mat
+    la $a2, @mat_o
+    jal math_matrix_mul
+    nop
+
     ;; Fill out GTE rotation matrix
-    move    $t3, $t0
-    sub     $t3, $zero, $t3
-    sll     $t3, 16
-    or      $t3, $t1
-    ctc2    $t3, $0
-    sll     $t0, 16
-    ctc2    $t0, $1
-    li      $t2, 0x1000
-    ctc2    $t1, $2
-    ctc2    $zero, $3
-    ctc2    $t2, $4
+    la      $t0, @mat_o
+    lw      $t1, 0($t0)
+    lw      $t2, 4($t0)
+    lw      $t3, 8($t0)
+    lw      $t4, 12($t0)
+    lh      $t5, 16($t0)
+    ctc2    $t1, $0
+    ctc2    $t2, $1
+    ctc2    $t3, $2
+    ctc2    $t4, $3
+    ctc2    $t5, $4
+
+    ;move    $t3, $t0
+    ;sub     $t3, $zero, $t3
+    ;sll     $t3, 16
+    ;or      $t3, $t1
+    ;ctc2    $t3, $0
+    ;sll     $t0, 16
+    ;ctc2    $t0, $1
+    ;li      $t2, 0x1000
+    ;ctc2    $t1, $2
+    ;ctc2    $zero, $3
+    ;ctc2    $t2, $4
+
+    ; Test matrix mul
+    ;la $a0, @mat_a
+    ;la $a1, @mat_b
+    ;la $a2, @mat_o
+    ;jal math_matrix_mul
+    ;nop
 
     ; Set H value
     li      $t0, 0x30
     ctc2    $t0, $26
 
     ; Set our translation vector
-    li      $t0, 0x100
+    li      $t0, 0x180
     ctc2    $t0, $7
 
     la      $s2, @d_icosphere_mesh
@@ -337,9 +385,18 @@ nop
     sw      $t8, 20($t7)
     sw      $t2, 24($t7)
 
+    ; Avedage vertex depths
+    sub     $t0, $t3, $t4
+    sra     $t0, 1
+    add     $t4, $t0
+    sub     $t0, $t5, $t4
+    sra     $t0, 1
+    add     $t4, $t0
+
+
     ; Insert into OT
     move    $a0, $t7
-    move    $a1, $t3; random z value, should average
+    move    $a1, $t4; random z value, should average
     srl     $a1, 4
     li      $a2, 0x6
     jal     @ot_insert
@@ -386,6 +443,49 @@ nop
     nop
 
 .align 4
+@mat_x_axis_rot_mat:
+;.fill 2 * 9
+; | 1 0 0 |
+; | 0 x x |
+; | 0 x x |
+.halfword 0x1 << 12, 0x0 << 12, 0x0 << 12
+.halfword 0x0 << 12, 0x0 << 12, 0x0 << 12
+.halfword 0x0 << 12, 0x0 << 12, 0x0 << 12
+.align 4
+@mat_y_axis_rot_mat:
+;.fill 2 * 9
+; | x 0 x |
+; | 0 1 0 |
+; | x 0 x |
+.halfword 0x0 << 12, 0x0 << 12, 0x0 << 12
+.halfword 0x0 << 12, 0x1 << 12, 0x0 << 12
+.halfword 0x0 << 12, 0x0 << 12, 0x0 << 12
+.align 4
+@mat_z_axis_rot_mat:
+;.fill 2 * 9
+; | x x 0 |
+; | x x 0 |
+; | 0 0 1 |
+.halfword 0x0 << 12, 0x0 << 12, 0x0 << 12
+.halfword 0x0 << 12, 0x0 << 12, 0x0 << 12
+.halfword 0x0 << 12, 0x0 << 12, 0x1 << 12
+.align 4
+@mat_a:
+;.fill 2 * 9
+.halfword 0x1 << 8, 0x2 << 8, 0x3 << 8
+.halfword 0x4 << 8, 0x5 << 8, 0x6 << 8
+.halfword 0x7 << 8, 0x8 << 8, 0x9 << 8
+.align 4
+@mat_b:
+;.fill 2 * 9
+.halfword 0x7 << 8, 0x4 << 8, 0x2 << 8
+.halfword 0x3 << 8, 0x5 << 8, 0x2 << 8
+.halfword 0x1 << 8, 0x2 << 8, 0x3 << 8
+.align 4
+@mat_o:
+.fill 2 * 9
+
+.align 4
 @d_triange_v0_xy:
 .word 0
 @d_triange_v0_z:
@@ -407,7 +507,7 @@ nop
 
 .align 4
 @d_icosphere_mesh:
-.incbin "raw_assets/meshes/icosphere.pxm"
+.incbin "raw_assets/meshes/monkey.pxm"
 
 ; TODO: replace with frame scratch pad allocator
 .align 4

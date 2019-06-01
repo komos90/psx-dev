@@ -10,12 +10,20 @@
     andi    a0, 0xff
 .endmacro
 
+; for 1:3:12 fixed point
+.macro math_fmul, x, y, z
+    mult y, z
+    mflo x
+    sra  x, 12
+.endmacro
+
 .align 4
 math_sin:
     la      $a1, tbl_sine
     sll     $a0, 1
     add     $a0, $a1
     lhu     $v0, 0($a0)
+    nop
     jr      $ra
     nop
 
@@ -25,5 +33,40 @@ math_cos:
     sll     $a0, 1
     add     $a0, $a1
     lhu     $v0, 0($a0)
+    nop
+    jr      $ra
+    nop
+
+; $a0: [in]  pointer to matrix A
+; $a1: [in]  pointer to matrix B
+; $a2: [out] pointer to matrix O
+math_matrix_mul:
+    move    $v1, $zero
+@@outer_loop:
+    lh      $t0, 0($a0)
+    lh      $t1, 2($a0)
+    lh      $t2, 4($a0)
+
+    move    $t9, $zero
+@@inner_loop:
+    add     $v0, $a1, $t9
+    lh      $t3, 0($v0)
+    lh      $t4, 6($v0)
+    lh      $t5, 12($v0)
+
+    math_fmul t6, t0, t3
+    math_fmul t7, t1, t4
+    math_fmul t8, t2, t5
+    add     $t6, $t7
+    add     $t6, $t8
+    sh      $t6, ($a2)
+    addiu   $a2, 2
+    addiu   $t9, 2
+    bne     $t9, 6, @@inner_loop
+    nop
+    addiu   $a0, 6
+    addiu   $v1, 1
+    bne     $v1, 3, @@outer_loop
+    nop
     jr      $ra
     nop
