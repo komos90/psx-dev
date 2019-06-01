@@ -1,5 +1,5 @@
 rule asm
-    command = armips $in
+    command = armips $in -temp $in.lst
 
 build main.bin: asm main.psx | math.psx tables.psx
 build main.exe: asm header.psx | main.bin

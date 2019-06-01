@@ -9,4 +9,5 @@
 *.bak
 __pycache__
 *.blend1
+*.lst
 

@@ -12,7 +12,11 @@ nop
 @dma_primary_control equ 0x1f8010f0
 @dma_block_control equ 0x1f8010e4
 @d6_madr equ 0x1f8010e0
+@d6_bcr equ 0x1f8010e4
 @d6_chsr equ 0x1f8010e8
+@d2_madr equ 0x1f8010a0
+@d2_bcr equ 0x1f8010a4
+@d2_chsr equ 0x1f8010a8
 @ordering_table_size equ 0x100
 
 .align 4
@@ -114,15 +118,77 @@ nop
     jr      $ra
     nop
 
-; $a0: pointer to the entry to insert
-; $a1: OT index (Z value)
+;! $a0: pointer to the entry to insert
+;! $a1: OT index (Z value)
+;! $a2: packet size
 @ot_insert:
+    ; address is 3 bytes
+    ;! $t0: address_mask
+    li      $t3, 0x00ffffff
+    and     $a0, $t3
+    ; load ordering table pointer
+    ;! $t0: ordering_table
     la      $t0, @ordering_table
+    and     $t0, $t3
+
+    ; Align our depth index to 4 bytes
     sll     $a1, 2
+    ; Move to absolute address for our depth index
     addu    $t0, $a1
-    lw      $t1, 4($t0)
-    sw      $a0, 4($t0)
-    sw      $t1, 4($a0)
+    ;! $t0: abs_ot_addr
+    ;! $a1: UNUSED
+    ; TODO: get otloopaddr
+    ; NOTE: should OR so we retain the packet size
+    ; if abs_ot_addr{$t0} == 0:
+    bne     $zero, $a1, @@else0
+    nop
+    ;      $t2 = 0x00ffffff
+    ;! $t2: next_sentinel_ot
+    li      $t2, 0x00ffffff
+    j       @@skipelse0
+    nop
+    ; else:
+@@else0:
+    ;      next_sentinel_ot{$t2} = abs_ot_addr{$t0} - 4
+    subi    $t2, $t0, 4
+@@skipelse0:
+    ;      cur_ptr{$t1} = (abs_ot_addr{$t0})
+    ;      t4 = t0 & 0x00ffffff
+    li      $t3, 0x00ffffff
+    and     $t4, $t0, $t3
+    lw      $t1, 0($t4)
+    nop
+    and     $t1, $t3
+    ;! $t1: cur_ptr
+    ; while cur_ptr{$t1} != next_sentinel_ot{$t2}:
+    beq     $t1, $t2, @@loop0end
+    nop
+@@loop0:
+    ;    abs_ot_addr{$t0} = cur_ptr{$t1}
+    move    $t0, $t1
+    ;    cur_ptr{$t1} = (abs_ot_addr{$t0})
+    and     $t4, $t0, $t3
+    lw      $t1, ($t4)
+    nop
+    and     $t1, $t3
+    bne     $t1, $t2, @@loop0
+    nop
+@@loop0end:
+    ; (abs_ot_addr{$t0}) = prim_to_insert_addr{$a0}
+    and     $t4, $t0, $t3
+    lw      $t0, ($t4)
+    and     $a0, $t3
+    li      $t1, 0xff000000
+    and     $t0, $t1
+    or      $a0, $t0
+    sw      $a0, ($t4)
+    ; (prim_to_insert_addr{$a0}) = next_sentinel_ot{$t2}
+    and     $a0, $t3
+    lw      $t0, ($a0)
+    and     $t2, $t3
+    or      $t2, $t0
+    sw      $t2, ($a0)
+
     jr      $ra
     nop
 
@@ -144,9 +210,14 @@ nop
     ctc2    $t0, $25
 
     ; Enable DMA
-    li      $t0, 1
-    sll     $t0, 27
+    li      $t0, 0x08000800
     sw      $t0, @dma_primary_control
+
+    ; Set DMA to CPU->GPU
+    li      $a0, 4
+    li      $a1, 0x3
+    jal     @gpu_comm
+    nop
 
     ; Prepare ordering table
     li      $t0, @ordering_table_last
@@ -157,9 +228,20 @@ nop
     ; Infinite loop
     li      $s0, 0x00000
 @@main_loop:
+    ; Set DMA to GPU->CPU
+    li      $a0, 4
+    li      $a1, 0x3
+    jal     @gpu_comm
+    nop
     ; Generate / regenerate ordering table
     li      $t0, 0x11000002
     sw      $t0, @d6_chsr
+
+    ; Set DMA to GPU->CPU
+    li      $a0, 4
+    li      $a1, 0x2
+    jal     @gpu_comm
+    nop
 
     jal     @clear_screen
     nop
@@ -197,6 +279,7 @@ nop
     la      $s2, @d_icosphere_mesh
     lw      $s1, @d_icosphere_mesh
     addi    $s2, 4
+    move    $s3, $zero
 @@for_each_tri:
     ;; Perform rotation of vertex 0
     ; Load vertex
@@ -241,8 +324,8 @@ nop
 
     ; Save primitive & put in OT
     la      $t7, @primitives
-    addu    $t7, $s2
-    li      $t8, 0x6
+    addu    $t7, $s3
+    li      $t8, 0x06000000
     sw      $t8, 0($t7)
     li      $t8, 0x30ff0000
     sw      $t8, 4($t7)
@@ -257,18 +340,28 @@ nop
     ; Insert into OT
     move    $a0, $t7
     move    $a1, $t3; random z value, should average
-    srl     $a1, 8
+    srl     $a1, 4
+    li      $a2, 0x6
     jal     @ot_insert
     nop
 
+    addiu   $s3, 4 * 8
     subiu   $s1, 1
     ; Branch back to the start of the loop for the rest of the polys
     bne     $s1, $zero, @@for_each_tri
     nop
 
+    ; Set d2_madr
+    lw      $t0, @d6_madr
+    nop
+    sw      $t0, @d2_madr
+
+    ; Set d2_bcr
+    sw      $zero, @d2_bcr
+
     ; Initiate DMA transfer:
     li      $t0, 0x01000401; set link mode, memory->GPU, DMA enable
-    sw      $t0, @d6_chsr
+    sw      $t0, @d2_chsr
 
     ; Increment rotation angle % 0xff
     addi    $s0, 0x1
@@ -308,7 +401,7 @@ nop
 
 .align 4
 @ordering_table:
-.fill (@ordering_table_size * 4 * 2) - 1
+.fill (@ordering_table_size - 1) * 4
 @ordering_table_last:
 .word 0
 
